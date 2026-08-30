@@ -22,9 +22,11 @@ RUN apt-get update -qq && \
         ninja-build \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED
-# ── PyTorch (pinned to cu128 — matches RTX 3090 driver ceiling) ──
-RUN pip install torch==2.10.0+cu128 torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/cu128 \
+# ── PyTorch (cu118 — widest driver compatibility for a loose
+#    RunPod "min CUDA 12.0" filter; SageAttention2 only needs >=12.0
+#    on Ampere regardless of which torch build is used) ────────────
+RUN pip install torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu118 \
     --quiet
 # ── ComfyUI ──────────────────────────────────────────────────────
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /workspace/ComfyUI
@@ -47,6 +49,9 @@ RUN for dir in /workspace/ComfyUI/custom_nodes/*/; do \
 # ── SageAttention2 (Ampere / RTX 3090 — compiled from source) ────
 # SageAttention3 is Blackwell-only (SM120); 3090 is SM86, so we build
 # the 2.x line instead. Requires nvcc from the devel base image above.
+# TORCH_CUDA_ARCH_LIST is required because GitHub Actions runners have
+# no GPU — setup.py can't auto-detect compute capability without one.
+ENV TORCH_CUDA_ARCH_LIST="8.6"
 RUN git clone https://github.com/thu-ml/SageAttention.git /tmp/SageAttention && \
     cd /tmp/SageAttention && \
     python3 setup.py install && \
